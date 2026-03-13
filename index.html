@@ -39,19 +39,22 @@
       color: #000;
     }
 
-    #info {
+    #info, #debug {
       position: fixed;
-      top: 16px;
       left: 16px;
       z-index: 999;
       color: #d9fff0;
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(0, 0, 0, 0.55);
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 13px;
       line-height: 1.5;
-      max-width: 360px;
+      max-width: 420px;
+      white-space: pre-line;
     }
+
+    #info { top: 16px; }
+    #debug { top: 150px; color: #ffd6d6; }
   </style>
 </head>
 <body>
@@ -64,6 +67,8 @@
   Espacio: pausar o reactivar caminar
 </div>
 
+<div id="debug">Cargando escena...</div>
+
 <button id="vr-btn">▶ ENTRAR EN VR</button>
 
 <a-scene
@@ -72,22 +77,22 @@
   renderer="antialias:true; colorManagement:true"
   background="color:#050c18">
 
-  <a-assets>
+  <a-assets timeout="30000">
     <a-asset-item id="modelo-entorno" src="Untitled.glb"></a-asset-item>
     <a-asset-item id="modelo-patroclo" src="patroclo.glb"></a-asset-item>
     <audio id="audio-fondo" src="Carrera-16-2.wav" preload="auto" crossorigin="anonymous"></audio>
   </a-assets>
 
   <a-entity id="rig">
-    <a-camera position="0 1.6 6" look-controls wasd-controls="enabled:true"></a-camera>
+    <a-camera position="0 1.6 8" look-controls wasd-controls="enabled:true"></a-camera>
   </a-entity>
 
   <!-- Entorno 3D -->
   <a-entity
     id="entorno"
     gltf-model="#modelo-entorno"
-    position="0 0 -12"
-    scale="1 1 1"
+    position="0 0 -14"
+    scale="0.5 0.5 0.5"
     rotation="0 0 0">
   </a-entity>
 
@@ -96,7 +101,7 @@
     id="patroclo"
     gltf-model="#modelo-patroclo"
     position="-2 0 -4"
-    scale="1.5 1.5 1.5"
+    scale="1 1 1"
     rotation="0 90 0"
     animation-mixer="clip: *; loop: repeat; timeScale: 1">
   </a-entity>
@@ -104,30 +109,37 @@
   <a-entity id="lh" oculus-touch-controls="hand:left" laser-controls="hand:left"></a-entity>
   <a-entity id="rh" oculus-touch-controls="hand:right" laser-controls="hand:right"></a-entity>
 
-  <a-light type="ambient" color="#ffffff" intensity="1.1"></a-light>
+  <a-light type="ambient" color="#ffffff" intensity="1.2"></a-light>
   <a-light type="directional" position="2 6 4" color="#dfefff" intensity="1.6"></a-light>
   <a-light type="point" position="0 4 -2" color="#00ff88" intensity="0.5" distance="12"></a-light>
 
+  <a-plane position="0 0 -4" rotation="-90 0 0" width="30" height="30" color="#101820"></a-plane>
   <a-sky color="#050c18"></a-sky>
 </a-scene>
 
 <script>
   const scene = document.getElementById('scene');
   const patroclo = document.getElementById('patroclo');
+  const entorno = document.getElementById('entorno');
   const vrBtn = document.getElementById('vr-btn');
   const audioElement = document.getElementById('audio-fondo');
+  const debug = document.getElementById('debug');
 
   let audioStarted = false;
   let isWalking = true;
-
   let p = { x: -2, y: 0, z: -4 };
-  let s = 1.5;
+  let s = 1;
   let ry = 90;
   let walkDirection = 1;
   let autoWalkId = null;
 
   audioElement.loop = true;
   audioElement.volume = 0.7;
+
+  function log(msg) {
+    debug.textContent = msg;
+    console.log(msg);
+  }
 
   function applyPosition() {
     patroclo.setAttribute('position', `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
@@ -145,10 +157,10 @@
     audioElement.play()
       .then(() => {
         audioStarted = true;
-        console.log("Audio reproduciéndose");
+        log('Audio WAV reproduciéndose.');
       })
       .catch((err) => {
-        console.log("Error reproduciendo audio:", err);
+        log('Audio bloqueado o no compatible: ' + err.message);
       });
   }
 
@@ -200,16 +212,13 @@
   }
 
   function toggleWalk() {
-    if (isWalking) {
-      stopAutoWalk();
-    } else {
-      startAutoWalk();
-    }
+    if (isWalking) stopAutoWalk();
+    else startAutoWalk();
   }
 
   function resetModel() {
     p = { x: -2, y: 0, z: -4 };
-    s = 1.5;
+    s = 1;
     walkDirection = 1;
     updateFacingByDirection();
     applyPosition();
@@ -217,16 +226,28 @@
     startAutoWalk();
   }
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp') {
-      p.z -= 0.2;
-      applyPosition();
-    }
+  // Eventos de carga / error de modelos
+  entorno.addEventListener('model-loaded', () => {
+    log('Entorno Untitled.glb cargado.');
+  });
 
-    if (e.key === 'ArrowDown') {
-      p.z += 0.2;
-      applyPosition();
-    }
+  entorno.addEventListener('model-error', (e) => {
+    log('Error cargando Untitled.glb. Si está en GitHub y pesa más de 100 MB, no cargará desde el repo normal.');
+    console.error(e);
+  });
+
+  patroclo.addEventListener('model-loaded', () => {
+    log('Personaje patroclo.glb cargado.');
+  });
+
+  patroclo.addEventListener('model-error', (e) => {
+    log('Error cargando patroclo.glb.');
+    console.error(e);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp') { p.z -= 0.2; applyPosition(); }
+    if (e.key === 'ArrowDown') { p.z += 0.2; applyPosition(); }
 
     if (e.key === 'ArrowLeft') {
       p.x -= 0.2;
@@ -252,9 +273,7 @@
       applyScale();
     }
 
-    if (e.key === 'r' || e.key === 'R') {
-      resetModel();
-    }
+    if (e.key === 'r' || e.key === 'R') resetModel();
 
     if (e.key === ' ') {
       e.preventDefault();
@@ -262,73 +281,10 @@
     }
   });
 
-  const R = document.getElementById('rh');
-  R.addEventListener('abuttondown', () => {
-    p.x += 0.2;
-    walkDirection = 1;
-    updateFacingByDirection();
-    applyPosition();
-  });
-
-  R.addEventListener('bbuttondown', () => {
-    p.x -= 0.2;
-    walkDirection = -1;
-    updateFacingByDirection();
-    applyPosition();
-  });
-
-  R.addEventListener('triggerdown', () => {
-    s = Math.min(s + 0.15, 5);
-    applyScale();
-  });
-
-  R.addEventListener('thumbstickmoved', (e) => {
-    const { x, y } = e.detail;
-    if (Math.abs(x) > 0.3) {
-      p.x += x * 0.08;
-      walkDirection = x > 0 ? 1 : -1;
-      updateFacingByDirection();
-    }
-    if (Math.abs(y) > 0.3) {
-      p.z += y * 0.08;
-    }
-    applyPosition();
-  });
-
-  const L = document.getElementById('lh');
-  L.addEventListener('xbuttondown', () => {
-    s = Math.max(s - 0.15, 0.2);
-    applyScale();
-  });
-
-  L.addEventListener('ybuttondown', () => {
-    resetModel();
-  });
-
-  L.addEventListener('triggerdown', () => {
-    toggleWalk();
-  });
-
-  L.addEventListener('thumbstickmoved', (e) => {
-    const { x, y } = e.detail;
-    if (Math.abs(x) > 0.3) {
-      p.x += x * 0.08;
-      walkDirection = x > 0 ? 1 : -1;
-      updateFacingByDirection();
-    }
-    if (Math.abs(y) > 0.3) {
-      p.y += y * 0.08;
-    }
-    applyPosition();
-  });
-
   vrBtn.addEventListener('click', () => {
     startAudio();
-    if (scene.is('vr-mode')) {
-      scene.exitVR();
-    } else {
-      scene.enterVR();
-    }
+    if (scene.is('vr-mode')) scene.exitVR();
+    else scene.enterVR();
   });
 
   scene.addEventListener('enter-vr', () => {
@@ -345,6 +301,7 @@
     applyScale();
     updateFacingByDirection();
     startAutoWalk();
+    log('Escena cargada. Si no ves los modelos, revisa si Untitled.glb está realmente accesible.');
   });
 </script>
 
