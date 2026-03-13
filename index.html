@@ -3,7 +3,14 @@
 <head>
   <meta charset="utf-8">
   <title>Patroclo VR - Meta Quest 3</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+
+  <!-- A-Frame Extras para animation-mixer -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@7.5.4/dist/aframe-extras.min.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -46,7 +53,7 @@
       border-radius: 8px;
       font-size: 13px;
       line-height: 1.5;
-      max-width: 320px;
+      max-width: 340px;
     }
   </style>
 </head>
@@ -54,10 +61,11 @@
 
 <div id="info">
   <strong>Controles:</strong><br>
-  Flechas: mover modelo<br>
-  + / - : escalar<br>
-  R: reiniciar<br>
-  Espacio: pausar / activar giro
+  Flechas: mover personaje<br>
+  + / - : aumentar o reducir tamaño<br>
+  R: reiniciar posición<br>
+  Espacio: pausar o reactivar caminar<br>
+  Botón: entrar en VR
 </div>
 
 <button id="vr-btn">▶ ENTRAR EN VR</button>
@@ -69,7 +77,7 @@
   background="color:#050c18">
 
   <a-assets>
-    <!-- Modelo -->
+    <!-- Modelo 3D -->
     <a-asset-item id="modelo-patroclo" src="patroclo.glb"></a-asset-item>
 
     <!-- Imagen de fondo -->
@@ -84,23 +92,24 @@
     <a-camera position="0 1.6 4.5" look-controls wasd-controls="enabled:true"></a-camera>
   </a-entity>
 
-  <!-- Fondo atrás del modelo -->
+  <!-- Fondo detrás -->
   <a-plane
     id="fondo"
-    position="0 2.4 -8"
+    position="0 2.5 -8"
     width="13"
     height="7"
     material="src:#imagen-fondo; shader:flat; side:double">
   </a-plane>
 
-  <!-- Modelo 3D -->
+  <!-- Personaje caminando -->
   <a-entity
     id="plant"
     gltf-model="#modelo-patroclo"
-    position="0 0.9 -2.5"
+    position="-2 0.9 -2.5"
     scale="2 2 2"
-    rotation="0 45 0"
-    animation__spin="property: rotation; to: 0 405 0; loop: true; dur: 10000; easing: linear">
+    rotation="0 90 0"
+    animation-mixer="clip: *; loop: repeat; timeScale: 1"
+    animation__walkmove="property: position; from: -2 0.9 -2.5; to: 2 0.9 -2.5; dir: alternate; loop: true; dur: 6000; easing: linear">
   </a-entity>
 
   <!-- Audio ambiente -->
@@ -137,12 +146,12 @@
   const soundEntity = document.getElementById('soundEntity');
   const vrBtn = document.getElementById('vr-btn');
 
-  let spinning = true;
   let audioStarted = false;
+  let isWalking = true;
 
-  let p = { x: 0, y: 0.9, z: -2.5 };
+  let p = { x: -2, y: 0.9, z: -2.5 };
   let s = 2;
-  let ry = 45;
+  let ry = 90;
 
   function applyPosition() {
     plant.setAttribute('position', `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
@@ -156,34 +165,44 @@
     plant.setAttribute('rotation', `0 ${ry} 0`);
   }
 
-  function toggleSpin() {
-    spinning = !spinning;
-
-    if (spinning) {
-      plant.setAttribute(
-        'animation__spin',
-        'property: rotation; to: 0 405 0; loop: true; dur: 10000; easing: linear'
-      );
-    } else {
-      plant.removeAttribute('animation__spin');
-      applyRotation();
-    }
-  }
-
-  function resetModel() {
-    p = { x: 0, y: 0.9, z: -2.5 };
-    s = 2;
-    ry = 45;
-    applyPosition();
-    applyScale();
-    applyRotation();
-  }
-
   function startAudio() {
     if (!audioStarted && soundEntity.components.sound) {
       soundEntity.components.sound.playSound();
       audioStarted = true;
     }
+  }
+
+  function startWalk() {
+    plant.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
+    plant.setAttribute(
+      'animation__walkmove',
+      'property: position; from: -2 0.9 -2.5; to: 2 0.9 -2.5; dir: alternate; loop: true; dur: 6000; easing: linear'
+    );
+    isWalking = true;
+  }
+
+  function stopWalk() {
+    plant.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 0');
+    plant.removeAttribute('animation__walkmove');
+    isWalking = false;
+  }
+
+  function toggleWalk() {
+    if (isWalking) {
+      stopWalk();
+    } else {
+      startWalk();
+    }
+  }
+
+  function resetModel() {
+    p = { x: -2, y: 0.9, z: -2.5 };
+    s = 2;
+    ry = 90;
+    applyPosition();
+    applyScale();
+    applyRotation();
+    startWalk();
   }
 
   document.addEventListener('keydown', (e) => {
@@ -223,19 +242,19 @@
 
     if (e.key === ' ') {
       e.preventDefault();
-      toggleSpin();
+      toggleWalk();
     }
   });
 
   const R = document.getElementById('rh');
   R.addEventListener('abuttondown', () => {
     ry += 20;
-    if (!spinning) applyRotation();
+    applyRotation();
   });
 
   R.addEventListener('bbuttondown', () => {
     ry -= 20;
-    if (!spinning) applyRotation();
+    applyRotation();
   });
 
   R.addEventListener('triggerdown', () => {
@@ -263,7 +282,7 @@
   });
 
   L.addEventListener('triggerdown', () => {
-    toggleSpin();
+    toggleWalk();
   });
 
   L.addEventListener('thumbstickmoved', (e) => {
@@ -297,6 +316,7 @@
     applyPosition();
     applyScale();
     applyRotation();
+    startWalk();
   });
 </script>
 
