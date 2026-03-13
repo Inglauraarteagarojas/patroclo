@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Patroclo VR - Meta Quest 3</title>
+  <title>Patroclo VR - Entorno 3D</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -50,7 +50,7 @@
       border-radius: 8px;
       font-size: 13px;
       line-height: 1.5;
-      max-width: 340px;
+      max-width: 360px;
     }
   </style>
 </head>
@@ -73,77 +73,72 @@
   background="color:#050c18">
 
   <a-assets>
+    <a-asset-item id="modelo-entorno" src="Untitled.glb"></a-asset-item>
     <a-asset-item id="modelo-patroclo" src="patroclo.glb"></a-asset-item>
-    <img id="imagen-fondo" src="foto.png" crossorigin="anonymous">
     <audio id="audio-fondo" src="Carrera-16-2.wav" preload="auto" crossorigin="anonymous"></audio>
   </a-assets>
 
   <a-entity id="rig">
-    <a-camera position="0 1.6 4.5" look-controls wasd-controls="enabled:true"></a-camera>
+    <a-camera position="0 1.6 6" look-controls wasd-controls="enabled:true"></a-camera>
   </a-entity>
 
-  <a-plane
-    id="fondo"
-    position="0 2.5 -8"
-    width="13"
-    height="7"
-    material="src:#imagen-fondo; shader:flat; side:double">
-  </a-plane>
-
+  <!-- Entorno 3D -->
   <a-entity
-    id="plant"
+    id="entorno"
+    gltf-model="#modelo-entorno"
+    position="0 0 -12"
+    scale="1 1 1"
+    rotation="0 0 0">
+  </a-entity>
+
+  <!-- Personaje -->
+  <a-entity
+    id="patroclo"
     gltf-model="#modelo-patroclo"
-    position="-2 0.9 -2.5"
-    scale="2 2 2"
+    position="-2 0 -4"
+    scale="1.5 1.5 1.5"
     rotation="0 90 0"
-    animation-mixer="clip: *; loop: repeat; timeScale: 1"
-    animation__walkmove="property: position; from: -2 0.9 -2.5; to: 2 0.9 -2.5; dir: alternate; loop: true; dur: 6000; easing: linear">
+    animation-mixer="clip: *; loop: repeat; timeScale: 1">
   </a-entity>
 
   <a-entity id="lh" oculus-touch-controls="hand:left" laser-controls="hand:left"></a-entity>
   <a-entity id="rh" oculus-touch-controls="hand:right" laser-controls="hand:right"></a-entity>
 
-  <a-light type="ambient" color="#ffffff" intensity="1.3"></a-light>
-  <a-light type="directional" position="2 5 3" color="#c8deff" intensity="2"></a-light>
-  <a-light type="point" position="0 3 -1" color="#00ff88" intensity="0.7" distance="8"></a-light>
-
-  <a-plane
-    position="0 0 -3"
-    rotation="-90 0 0"
-    width="14"
-    height="14"
-    color="#101820">
-  </a-plane>
+  <a-light type="ambient" color="#ffffff" intensity="1.1"></a-light>
+  <a-light type="directional" position="2 6 4" color="#dfefff" intensity="1.6"></a-light>
+  <a-light type="point" position="0 4 -2" color="#00ff88" intensity="0.5" distance="12"></a-light>
 
   <a-sky color="#050c18"></a-sky>
 </a-scene>
 
 <script>
   const scene = document.getElementById('scene');
-  const plant = document.getElementById('plant');
+  const patroclo = document.getElementById('patroclo');
   const vrBtn = document.getElementById('vr-btn');
   const audioElement = document.getElementById('audio-fondo');
 
   let audioStarted = false;
   let isWalking = true;
 
-  let p = { x: -2, y: 0.9, z: -2.5 };
-  let s = 2;
+  let p = { x: -2, y: 0, z: -4 };
+  let s = 1.5;
   let ry = 90;
+  let walkDirection = 1;
+  let autoWalkId = null;
 
   audioElement.loop = true;
   audioElement.volume = 0.7;
 
   function applyPosition() {
-    plant.setAttribute('position', `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
+    patroclo.setAttribute('position', `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
   }
 
   function applyScale() {
-    plant.setAttribute('scale', `${s} ${s} ${s}`);
+    patroclo.setAttribute('scale', `${s} ${s} ${s}`);
   }
 
   function applyRotation() {
-    plant.setAttribute('rotation', `0 ${ry} 0`);
+    patroclo.setAttribute('rotation', `0 ${ry} 0`);
   }
 
   function startAudio() {
@@ -157,67 +152,103 @@
       });
   }
 
-  function startWalk() {
-    plant.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
-    plant.setAttribute(
-      'animation__walkmove',
-      'property: position; from: -2 0.9 -2.5; to: 2 0.9 -2.5; dir: alternate; loop: true; dur: 6000; easing: linear'
-    );
-    isWalking = true;
+  function updateFacingByDirection() {
+    ry = walkDirection === 1 ? 90 : -90;
+    applyRotation();
   }
 
-  function stopWalk() {
-    plant.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 0');
-    plant.removeAttribute('animation__walkmove');
+  function startWalkAnimation() {
+    patroclo.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 1');
+  }
+
+  function stopWalkAnimation() {
+    patroclo.setAttribute('animation-mixer', 'clip: *; loop: repeat; timeScale: 0');
+  }
+
+  function startAutoWalk() {
+    startWalkAnimation();
+    isWalking = true;
+
+    if (autoWalkId) clearInterval(autoWalkId);
+
+    autoWalkId = setInterval(() => {
+      p.x += 0.03 * walkDirection;
+
+      if (p.x >= 2) {
+        p.x = 2;
+        walkDirection = -1;
+        updateFacingByDirection();
+      }
+
+      if (p.x <= -2) {
+        p.x = -2;
+        walkDirection = 1;
+        updateFacingByDirection();
+      }
+
+      applyPosition();
+    }, 50);
+  }
+
+  function stopAutoWalk() {
+    if (autoWalkId) {
+      clearInterval(autoWalkId);
+      autoWalkId = null;
+    }
+    stopWalkAnimation();
     isWalking = false;
   }
 
   function toggleWalk() {
     if (isWalking) {
-      stopWalk();
+      stopAutoWalk();
     } else {
-      startWalk();
+      startAutoWalk();
     }
   }
 
   function resetModel() {
-    p = { x: -2, y: 0.9, z: -2.5 };
-    s = 2;
-    ry = 90;
+    p = { x: -2, y: 0, z: -4 };
+    s = 1.5;
+    walkDirection = 1;
+    updateFacingByDirection();
     applyPosition();
     applyScale();
-    applyRotation();
-    startWalk();
+    startAutoWalk();
   }
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowUp') {
-      p.z -= 0.12;
+      p.z -= 0.2;
       applyPosition();
     }
 
     if (e.key === 'ArrowDown') {
-      p.z += 0.12;
+      p.z += 0.2;
       applyPosition();
     }
 
     if (e.key === 'ArrowLeft') {
-      p.x -= 0.12;
+      p.x -= 0.2;
+      walkDirection = -1;
+      updateFacingByDirection();
       applyPosition();
     }
 
     if (e.key === 'ArrowRight') {
-      p.x += 0.12;
+      p.x += 0.2;
+      walkDirection = 1;
+      updateFacingByDirection();
       applyPosition();
     }
 
     if (e.key === '+' || e.key === '=') {
-      s = Math.min(s + 0.2, 7);
+      s = Math.min(s + 0.1, 5);
       applyScale();
     }
 
     if (e.key === '-') {
-      s = Math.max(s - 0.2, 0.3);
+      s = Math.max(s - 0.1, 0.2);
       applyScale();
     }
 
@@ -233,32 +264,40 @@
 
   const R = document.getElementById('rh');
   R.addEventListener('abuttondown', () => {
-    ry += 20;
-    applyRotation();
+    p.x += 0.2;
+    walkDirection = 1;
+    updateFacingByDirection();
+    applyPosition();
   });
 
   R.addEventListener('bbuttondown', () => {
-    ry -= 20;
-    applyRotation();
+    p.x -= 0.2;
+    walkDirection = -1;
+    updateFacingByDirection();
+    applyPosition();
   });
 
   R.addEventListener('triggerdown', () => {
-    s = Math.min(s + 0.25, 7);
+    s = Math.min(s + 0.15, 5);
     applyScale();
   });
 
   R.addEventListener('thumbstickmoved', (e) => {
     const { x, y } = e.detail;
-    if (Math.abs(x) > 0.3 || Math.abs(y) > 0.3) {
-      p.z += y * -0.05;
-      p.x += x * 0.05;
-      applyPosition();
+    if (Math.abs(x) > 0.3) {
+      p.x += x * 0.08;
+      walkDirection = x > 0 ? 1 : -1;
+      updateFacingByDirection();
     }
+    if (Math.abs(y) > 0.3) {
+      p.z += y * 0.08;
+    }
+    applyPosition();
   });
 
   const L = document.getElementById('lh');
   L.addEventListener('xbuttondown', () => {
-    s = Math.max(s - 0.25, 0.3);
+    s = Math.max(s - 0.15, 0.2);
     applyScale();
   });
 
@@ -272,11 +311,15 @@
 
   L.addEventListener('thumbstickmoved', (e) => {
     const { x, y } = e.detail;
-    if (Math.abs(x) > 0.3 || Math.abs(y) > 0.3) {
-      p.y += y * 0.05;
-      p.x += x * 0.05;
-      applyPosition();
+    if (Math.abs(x) > 0.3) {
+      p.x += x * 0.08;
+      walkDirection = x > 0 ? 1 : -1;
+      updateFacingByDirection();
     }
+    if (Math.abs(y) > 0.3) {
+      p.y += y * 0.08;
+    }
+    applyPosition();
   });
 
   vrBtn.addEventListener('click', () => {
@@ -290,9 +333,7 @@
 
   scene.addEventListener('enter-vr', () => {
     vrBtn.style.display = 'none';
-    if (!audioStarted) {
-      startAudio();
-    }
+    if (!audioStarted) startAudio();
   });
 
   scene.addEventListener('exit-vr', () => {
@@ -302,8 +343,8 @@
   scene.addEventListener('loaded', () => {
     applyPosition();
     applyScale();
-    applyRotation();
-    startWalk();
+    updateFacingByDirection();
+    startAutoWalk();
   });
 </script>
 
