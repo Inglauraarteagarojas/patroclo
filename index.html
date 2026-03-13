@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Patroclo VR - Entorno 3D</title>
+  <title>Patroclo VR - Caminando</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -39,22 +39,19 @@
       color: #000;
     }
 
-    #info, #debug {
+    #info {
       position: fixed;
+      top: 16px;
       left: 16px;
       z-index: 999;
       color: #d9fff0;
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0, 0, 0, 0.50);
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 13px;
       line-height: 1.5;
-      max-width: 420px;
-      white-space: pre-line;
+      max-width: 360px;
     }
-
-    #info { top: 16px; }
-    #debug { top: 150px; color: #ffd6d6; }
   </style>
 </head>
 <body>
@@ -62,12 +59,10 @@
 <div id="info">
   <strong>Controles:</strong><br>
   Flechas: mover personaje<br>
-  + / - : aumentar o reducir tamaño<br>
-  R: reiniciar posición<br>
-  Espacio: pausar o reactivar caminar
+  + / - : escalar personaje<br>
+  R: reiniciar<br>
+  Espacio: pausar / reactivar caminar
 </div>
-
-<div id="debug">Cargando escena...</div>
 
 <button id="vr-btn">▶ ENTRAR EN VR</button>
 
@@ -79,7 +74,7 @@
 
   <a-assets timeout="30000">
     <a-asset-item id="modelo-entorno" src="Untitled.glb"></a-asset-item>
-    <a-asset-item id="modelo-patroclo" src="patroclo.glb"></a-asset-item>
+    <a-asset-item id="modelo-patroclo" src="animacionPatroclo.glb"></a-asset-item>
     <audio id="audio-fondo" src="Carrera-16-2.wav" preload="auto" crossorigin="anonymous"></audio>
   </a-assets>
 
@@ -87,7 +82,7 @@
     <a-camera position="0 1.6 8" look-controls wasd-controls="enabled:true"></a-camera>
   </a-entity>
 
-  <!-- Entorno 3D -->
+  <!-- Entorno -->
   <a-entity
     id="entorno"
     gltf-model="#modelo-entorno"
@@ -96,7 +91,7 @@
     rotation="0 0 0">
   </a-entity>
 
-  <!-- Personaje -->
+  <!-- Personaje animado -->
   <a-entity
     id="patroclo"
     gltf-model="#modelo-patroclo"
@@ -120,26 +115,20 @@
 <script>
   const scene = document.getElementById('scene');
   const patroclo = document.getElementById('patroclo');
-  const entorno = document.getElementById('entorno');
   const vrBtn = document.getElementById('vr-btn');
   const audioElement = document.getElementById('audio-fondo');
-  const debug = document.getElementById('debug');
 
   let audioStarted = false;
   let isWalking = true;
+  let autoWalkId = null;
+
   let p = { x: -2, y: 0, z: -4 };
   let s = 1;
   let ry = 90;
   let walkDirection = 1;
-  let autoWalkId = null;
 
   audioElement.loop = true;
   audioElement.volume = 0.7;
-
-  function log(msg) {
-    debug.textContent = msg;
-    console.log(msg);
-  }
 
   function applyPosition() {
     patroclo.setAttribute('position', `${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`);
@@ -154,14 +143,11 @@
   }
 
   function startAudio() {
-    audioElement.play()
-      .then(() => {
-        audioStarted = true;
-        log('Audio WAV reproduciéndose.');
-      })
-      .catch((err) => {
-        log('Audio bloqueado o no compatible: ' + err.message);
-      });
+    audioElement.play().then(() => {
+      audioStarted = true;
+    }).catch(err => {
+      console.log('Error audio:', err);
+    });
   }
 
   function updateFacingByDirection() {
@@ -226,28 +212,24 @@
     startAutoWalk();
   }
 
-  // Eventos de carga / error de modelos
-  entorno.addEventListener('model-loaded', () => {
-    log('Entorno Untitled.glb cargado.');
-  });
-
-  entorno.addEventListener('model-error', (e) => {
-    log('Error cargando Untitled.glb. Si está en GitHub y pesa más de 100 MB, no cargará desde el repo normal.');
-    console.error(e);
-  });
-
   patroclo.addEventListener('model-loaded', () => {
-    log('Personaje patroclo.glb cargado.');
+    console.log('animacionPatroclo.glb cargado');
   });
 
   patroclo.addEventListener('model-error', (e) => {
-    log('Error cargando patroclo.glb.');
-    console.error(e);
+    console.log('Error cargando animacionPatroclo.glb', e);
   });
 
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp') { p.z -= 0.2; applyPosition(); }
-    if (e.key === 'ArrowDown') { p.z += 0.2; applyPosition(); }
+    if (e.key === 'ArrowUp') {
+      p.z -= 0.2;
+      applyPosition();
+    }
+
+    if (e.key === 'ArrowDown') {
+      p.z += 0.2;
+      applyPosition();
+    }
 
     if (e.key === 'ArrowLeft') {
       p.x -= 0.2;
@@ -273,7 +255,9 @@
       applyScale();
     }
 
-    if (e.key === 'r' || e.key === 'R') resetModel();
+    if (e.key === 'r' || e.key === 'R') {
+      resetModel();
+    }
 
     if (e.key === ' ') {
       e.preventDefault();
@@ -301,9 +285,9 @@
     applyScale();
     updateFacingByDirection();
     startAutoWalk();
-    log('Escena cargada. Si no ves los modelos, revisa si Untitled.glb está realmente accesible.');
   });
 </script>
 
 </body>
 </html>
+
